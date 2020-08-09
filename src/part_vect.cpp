@@ -98,7 +98,7 @@ void part_vect_sort_begin(part_iter b, part_iter e, part_iter mid, float xmid, i
 			std::unique_lock<mutex_type> lock(sort_mutex);
 //			printf( "--%i %i %i\n",myid, begin,std::min(part_end, mid) );
 			for (part_iter i = begin; i < std::min(part_end, mid); i++) {
-				if (pos_to_double(parts(i).x[dim]) >= xmid) {
+				if (parts(i).x[dim] >= xmid) {
 					send.push_back(parts(i));
 					done = false;
 					if (send.size() >= chunk_size) {
@@ -115,7 +115,7 @@ void part_vect_sort_begin(part_iter b, part_iter e, part_iter mid, float xmid, i
 				if (recv.size()) {
 					for (part_iter i = begin; i < std::min(part_end, mid); i++) {
 						begin = i;
-						if (pos_to_double(parts(i).x[dim]) >= xmid) {
+						if (parts(i).x[dim] >= xmid) {
 							parts(i) = recv[j++];
 							if (recv.size() == j) {
 								break;
@@ -133,7 +133,7 @@ std::vector<particle> part_vect_sort_end(part_iter b, part_iter e, part_iter mid
 	std::lock_guard<mutex_type> lock(sort_mutex);
 	int j = 0;
 	for (part_iter i = std::max(mid, part_begin); i < std::min(part_end, e); i++) {
-		if (pos_to_double(parts(i).x[dim]) < xmid) {
+		if (parts(i).x[dim] < xmid) {
 			auto tmp = parts(i);
 			parts(i) = low[j];
 			low[j++] = tmp;
@@ -236,7 +236,7 @@ kick_return part_vect_kick(part_iter b, part_iter e, rung_type min_rung, bool do
 				rc.stats.kin += 0.5 * m * parts(i).v.dot(parts(i).v);
 				if (parts(i).flags.out) {
 					output out;
-					out.x = pos_to_double(parts(i).x);
+					out.x = parts(i).x;
 					out.v = parts(i).v;
 					out.g = f[j].g;
 					out.phi = f[j].phi;
@@ -272,7 +272,7 @@ std::vector<vect<float>> part_vect_read_active_positions(part_iter b, part_iter 
 	}
 	for (part_iter i = b; i < std::min(e, part_end); i++) {
 		if (parts(i).rung >= rung) {
-			x.push_back(pos_to_double(parts(i).x));
+			x.push_back(parts(i).x);
 		}
 	}
 	if (e > part_end) {
@@ -298,7 +298,7 @@ void part_vect_drift(float dt) {
 			const auto end = std::min(part_end, i + chunk_size);
 			for (int j = i; j < end; j++) {
 				const vect<double> dx = parts(j).v * dt;
-				vect<double> x = pos_to_double(parts(j).x);
+				vect<double> x = parts(j).x;
 				x += dx;
 				for (int dim = 0; dim < NDIM; dim++) {
 					while (x[dim] >= 1.0) {
@@ -308,7 +308,7 @@ void part_vect_drift(float dt) {
 						x[dim] += 1.0;
 					}
 				}
-				parts(j).x = double_to_pos(x);
+				parts(j).x = x;
 			}
 		};
 		futs.push_back(hpx::async(std::move(func)));
@@ -328,7 +328,7 @@ std::pair<float, vect<float>> part_vect_center_of_mass(part_iter b, part_iter e)
 	rc.second = vect<float>(0.0);
 	for (part_iter i = b; i < this_end; i++) {
 		rc.first += m;
-		rc.second += pos_to_double(parts(i).x) * m;
+		rc.second += parts(i).x * m;
 	}
 	if (e > part_end) {
 		auto tmp = fut.get();
@@ -364,7 +364,7 @@ multipole_info part_vect_multipole_info(vect<float> com, rung_type mrung, part_i
 		for (int k = 0; k < simd_float::size(); k++) {
 			if (i + k < this_end) {
 				for (int dim = 0; dim < NDIM; dim++) {
-					X[dim][k] = pos_to_double(parts(i + k).x[dim]);
+					X[dim][k] = parts(i + k).x[dim];
 				}
 				mass[k] = m;
 			} else {
@@ -392,7 +392,7 @@ multipole_info part_vect_multipole_info(vect<float> com, rung_type mrung, part_i
 	rc.r = 0.0;
 	rc.has_active = false;
 	for (part_iter i = b; i < this_end; i++) {
-		rc.r = std::max(rc.r, (ireal) abs(pos_to_double(parts(i).x) - rc.x));
+		rc.r = std::max(rc.r, (ireal) abs(parts(i).x - rc.x));
 		if (parts(i).rung >= mrung) {
 			rc.has_active = true;
 		}
@@ -521,7 +521,7 @@ part_iter part_vect_count_lo(part_iter b, part_iter e, double xmid, int dim) {
 			const auto end = std::min(i + chunk_size, this_end);
 			part_iter count = 0;
 			for (part_iter j = i; j < end; j++) {
-				if (pos_to_double(parts(j).x[dim]) < xmid) {
+				if (parts(j).x[dim] < xmid) {
 					count++;
 				}
 			}
@@ -554,10 +554,10 @@ part_iter part_vect_sort(part_iter b, part_iter e, double xmid, int dim) {
 			auto lo = b;
 			auto hi = e;
 			while (lo < hi) {
-				if (pos_to_double(parts(lo).x[dim]) >= xmid) {
+				if (parts(lo).x[dim] >= xmid) {
 					while (lo != hi) {
 						hi--;
-						if (pos_to_double(parts(hi).x[dim]) < xmid) {
+						if (parts(hi).x[dim] < xmid) {
 							auto tmp = parts(lo);
 							parts(lo) = parts(hi);
 							parts(hi) = tmp;
@@ -596,7 +596,7 @@ range part_vect_range(part_iter b, part_iter e) {
 		for (part_iter i = b; i < this_e; i++) {
 			const auto &p = parts(i);
 			for (int dim = 0; dim < NDIM; dim++) {
-				const auto x = pos_to_double(p.x[dim]);
+				const auto x = p.x[dim];
 				r.max[dim] = std::max(r.max[dim], x);
 				r.min[dim] = std::min(r.min[dim], x);
 			}

@@ -50,7 +50,6 @@ set(tigersph_header_files
 	tigersph/options.hpp
 	tigersph/part_vect.hpp
 	tigersph/particle.hpp
-	tigersph/position.hpp
 	tigersph/rand.hpp
 	tigersph/range.hpp
 	tigersph/taylor.hpp

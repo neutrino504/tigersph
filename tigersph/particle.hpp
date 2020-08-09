@@ -8,10 +8,12 @@
 #ifndef TIGERGRAV_PARTICLE_HPP_
 #define TIGERGRAV_PARTICLE_HPP_
 
-#include <tigersph/position.hpp>
+#include <tigersph/range.hpp>
 #include <tigersph/time.hpp>
+#include <tigersph/vect.hpp>
 
 #include <vector>
+
 
 
 struct particle {

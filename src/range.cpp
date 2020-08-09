@@ -7,22 +7,22 @@
 
 #include <tigersph/range.hpp>
 
-vect<double> range_center(const range &r) {
-	vect<double> c;
+vect<pos_type> range_center(const range &r) {
+	vect<pos_type> c;
 	for (int dim = 0; dim < NDIM; dim++) {
 		c[dim] = (r.min[dim] + r.max[dim]) / 2.0;
 	}
 	return c;
 }
 
-range reflect_range(const range &r_, int dim, double x) {
+range reflect_range(const range &r_, int dim, pos_type x) {
 	range r = r_;
 	r.min[dim] = 2 * x - r_.max[dim];
 	r.max[dim] = 2 * x - r_.min[dim];
 	return r;
 }
 
-range scale_range(const range &r_, double s) {
+range scale_range(const range &r_, pos_type s) {
 	range r;
 	for (int dim = 0; dim < NDIM; dim++) {
 		r.min[dim] = r_.min[dim] * s;
@@ -31,7 +31,7 @@ range scale_range(const range &r_, double s) {
 	return r;
 }
 
-range shift_range(const range &r_, const vect<double> &v) {
+range shift_range(const range &r_, const vect<pos_type> &v) {
 	range r;
 	for (int dim = 0; dim < NDIM; dim++) {
 		r.min[dim] = r_.min[dim] + v[dim];
@@ -40,7 +40,7 @@ range shift_range(const range &r_, const vect<double> &v) {
 	return r;
 }
 
-bool in_range(const vect<double> &x, const range &r) {
+bool in_range(const vect<pos_type> &x, const range &r) {
 	for (int dim = 0; dim < NDIM; dim++) {
 		if (x[dim] < r.min[dim] || x[dim] > r.max[dim]) {
 			return false;
@@ -49,8 +49,8 @@ bool in_range(const vect<double> &x, const range &r) {
 	return true;
 }
 
-vect<double> range_span(const range &r) {
-	vect<double> s;
+vect<pos_type> range_span(const range &r) {
+	vect<pos_type> s;
 	for (int dim = 0; dim < NDIM; dim++) {
 		s[dim] = r.max[dim] - r.min[dim];
 	}
@@ -61,8 +61,8 @@ bool in_range(const range &a, const range &b) {
 	return in_range(a.min, b) && in_range(a.max, b);
 }
 
-double range_volume(const range &r) {
-	double v = 1.0;
+pos_type range_volume(const range &r) {
+	pos_type v = 1.0;
 	for (int dim = 0; dim < NDIM; dim++) {
 		v *= r.max[dim] - r.min[dim];
 	}
@@ -83,13 +83,13 @@ bool ranges_intersect(const range &a, const range &b) {
 range null_range() {
 	range null;
 	for (int dim = 0; dim < NDIM; dim++) {
-		null.min[dim] = std::numeric_limits<double>::max();
-		null.max[dim] = -std::numeric_limits<double>::max();
+		null.min[dim] = std::numeric_limits<pos_type>::max();
+		null.max[dim] = -std::numeric_limits<pos_type>::max();
 	}
 	return null;
 }
 
-range range_around(const vect<double> &p, double h) {
+range range_around(const vect<pos_type> &p, pos_type h) {
 	range r;
 	for (int dim = 0; dim < NDIM; dim++) {
 		r.max[dim] = p[dim] + h;
@@ -98,7 +98,7 @@ range range_around(const vect<double> &p, double h) {
 	return r;
 }
 
-range expand_range(const range &rs, double h) {
+range expand_range(const range &rs, pos_type h) {
 	range rb;
 	for (int dim = 0; dim < NDIM; dim++) {
 		rb.min[dim] = rs.min[dim] + h;

@@ -370,7 +370,7 @@ kick_return tree::kick_fmm(std::vector<check_item> checklist, const vect<ireal> 
 	for (auto &v : dsource_futs) {
 		auto s = v.get();
 		for (auto x : s) {
-			sources.push_back(pos_to_double(x));
+			sources.push_back(x);
 		}
 	}
 	flop += gravity_CP_direct(L, multi.x, sources);
@@ -450,7 +450,7 @@ kick_return tree::kick_fmm(std::vector<check_item> checklist, const vect<ireal> 
 		for (auto &v : dsource_futs) {
 			auto s = v.get();
 			for (auto x : s) {
-				sources.push_back(pos_to_double(x));
+				sources.push_back(x);
 			}
 		}
 		flop += gravity_PP_direct(f, x, sources);

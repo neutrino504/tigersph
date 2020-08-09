@@ -16,7 +16,7 @@ part_vect initial_particle_set(std::string pn, int N, int Nout) {
 		for (int i = 0; i < N; i++) {
 			particle p;
 			for (int dim = 0; dim < NDIM; dim++) {
-				p.x[dim] = double_to_pos(rand1());
+				p.x[dim] = rand1();
 				p.v[dim] = 0.0;
 			}
 			parts.push_back(std::move(p));
@@ -24,13 +24,13 @@ part_vect initial_particle_set(std::string pn, int N, int Nout) {
 	} else if (pn == "two_body") {
 		parts.resize(2);
 		for (int i = 0; i < 2; i++) {
-			parts[i].x = double_to_pos(vect<float>(0.5));
+			parts[i].x = vect<float>(0.5);
 			parts[i].v = vect<float>(0.0);
 		}
-		parts[0].x[0] = double_to_pos(0.75);
-		parts[0].v[1] = 1.0 / std::sqrt(2);
-		parts[1].x[0] = double_to_pos(0.25);
-		parts[1].v[1] = -1.0 / std::sqrt(2);
+//		parts[0].x[0] = double_to_pos(0.75);
+//		parts[0].v[1] = 1.0 / std::sqrt(2);
+//		parts[1].x[0] = double_to_pos(0.25);
+//		parts[1].v[1] = -1.0 / std::sqrt(2);
 	} else {
 		printf("Problem %s unknown\n", pn.c_str());
 		abort();
