@@ -117,7 +117,7 @@ bool tree::refine(int stack_cnt) {
 //	auto myparts = part_vect_read(part_begin, part_end).get();
 //	bool abortme = false;
 //	for (const auto &p : myparts) {
-//		const auto x = pos_to_double(p.x);
+//		const auto x = p.x;
 //		if (!in_range(x, box)) {
 //			printf("Found particle out of range!\n");
 //			printf("%e %e %e\n", x[0], x[1], x[2]);
@@ -151,15 +151,9 @@ bool tree::refine(int stack_cnt) {
 		}
 		range boxl = box;
 		range boxr = box;
-		float mid = (box.max[max_dim] + box.min[max_dim]) * 0.5;
+		const auto mid = part_vect_find_median(part_begin, part_end, max_dim);
 		boxl.max[max_dim] = boxr.min[max_dim] = mid;
-		part_iter mid_iter;
-		if (part_end - part_begin == 0) {
-			mid_iter = part_end;
-		} else {
-			mid_iter = part_vect_sort(part_begin, part_end, mid, max_dim);
-		}
-//		}
+		const auto mid_iter = (part_end + part_begin) / 2;
 		auto rcl = hpx::new_ < tree > (localities[part_vect_locality_id(part_begin)], boxl, part_begin, mid_iter, level + 1);
 		auto rcr = hpx::new_ < tree > (localities[part_vect_locality_id(mid_iter)], boxr, mid_iter, part_end, level + 1);
 

@@ -12,15 +12,18 @@
 
 #include <limits>
 
-
 using pos_type = float;
 
+inline bool almost_equal(pos_type a, pos_type b) {
+	const auto avg = (a + b) / 2.0;
+	return (a == avg) || (b == avg);
+}
 
 struct range {
 	vect<pos_type> min;
 	vect<pos_type> max;
 	template<class Arc>
-	void serialize(Arc& arc,unsigned) {
+	void serialize(Arc &arc, unsigned) {
 		arc & min;
 		arc & max;
 	}
@@ -28,8 +31,8 @@ struct range {
 
 range reflect_range(const range&, int dim, pos_type axis);
 vect<pos_type> range_center(const range &r);
-range shift_range(const range& r, const vect<pos_type>&);
-range scale_range(const range& , pos_type);
+range shift_range(const range &r, const vect<pos_type>&);
+range scale_range(const range&, pos_type);
 vect<pos_type> range_span(const range&);
 bool in_range(const vect<pos_type>&, const range&);
 bool in_range(const range&, const range&);

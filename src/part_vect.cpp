@@ -28,15 +28,15 @@ static int myid;
 static std::unordered_map<part_iter, hpx::shared_future<std::vector<vect<pos_type>>>> pos_cache[POS_CACHE_SIZE];
 static mutex_type pos_cache_mtx[POS_CACHE_SIZE];
 
-HPX_PLAIN_ACTION(part_vect_init);
-HPX_PLAIN_ACTION(part_vect_read_position);
-HPX_PLAIN_ACTION(part_vect_range);
-HPX_PLAIN_ACTION(part_vect_cache_reset);
-HPX_PLAIN_ACTION(part_vect_center_of_mass);
-HPX_PLAIN_ACTION(part_vect_multipole_info);
-HPX_PLAIN_ACTION(part_vect_drift);
-HPX_PLAIN_ACTION(part_vect_read_active_positions);
-HPX_PLAIN_ACTION(part_vect_kick);
+HPX_PLAIN_ACTION (part_vect_init);
+HPX_PLAIN_ACTION (part_vect_read_position);
+HPX_PLAIN_ACTION (part_vect_range);
+HPX_PLAIN_ACTION (part_vect_cache_reset);
+HPX_PLAIN_ACTION (part_vect_center_of_mass);
+HPX_PLAIN_ACTION (part_vect_multipole_info);
+HPX_PLAIN_ACTION (part_vect_drift);
+HPX_PLAIN_ACTION (part_vect_read_active_positions);
+HPX_PLAIN_ACTION (part_vect_kick);
 
 inline particle& parts(part_iter i) {
 	const int j = i - part_begin;
@@ -65,11 +65,107 @@ int round_robin(int me, int round, int N) {
 
 void part_vect_sort_begin(part_iter b, part_iter e, part_iter mid, float xmid, int dim);
 std::vector<particle> part_vect_sort_end(part_iter b, part_iter e, part_iter mid, float xmid, int dim, std::vector<particle>);
+pos_type part_vect_find_median_helper(part_iter b, part_iter e, part_iter median, pos_type xmid, int dim);
 
-HPX_PLAIN_ACTION(part_vect_sort_begin);
-HPX_PLAIN_ACTION(part_vect_sort_end);
+HPX_PLAIN_ACTION (part_vect_sort_begin);
+HPX_PLAIN_ACTION (part_vect_sort_end);
+HPX_PLAIN_ACTION (part_vect_avg_pos);
+HPX_PLAIN_ACTION (part_vect_find_median_helper);
 
 mutex_type sort_mutex;
+
+avg_pos_return part_vect_avg_pos(part_iter b, part_iter e, int dim) {
+	static const auto opts = options::get();
+	std::vector < hpx::future < avg_pos_return >> futs;
+	const part_iter N = localities.size();
+	const part_iter M = opts.problem_size;
+	pos_type min = std::numeric_limits < pos_type > ::max();
+	pos_type max = std::numeric_limits < pos_type > ::min();
+	if (part_end < e) {
+		for (int n = part_vect_locality_id(part_end); n * M / N < e; n++) {
+			auto fut = hpx::async < part_vect_avg_pos_action > (localities[n], n * M / N, std::min(e, (n + 1) * M / N), dim);
+			futs.push_back(std::move(fut));
+		}
+	}
+	const auto this_e = std::min(part_end, e);
+	pos_type avg = 0.0;
+	std::uint64_t count = this_e - b;
+	for (auto i = b; i < this_e; i++) {
+		const auto x = parts(i).x[dim];
+		avg += x;
+		min = std::min(min, x);
+		max = std::max(max, x);
+	}
+	int j = 0;
+	if (part_end < e) {
+		for (int n = part_vect_locality_id(part_end); n * M / N < e; n++) {
+			const auto rc = futs[j++].get();
+			const auto this_avg = rc.avg;
+			const auto this_count = std::min(e, (n + 1) * M / N) - n * M / N;
+			count += this_count;
+			avg += this_avg * this_count;
+			min = std::min(min, rc.min);
+			max = std::max(max, rc.max);
+		}
+	}
+	avg_pos_return rc;
+	avg /= count;
+	rc.avg = avg;
+	rc.max = max;
+	rc.min = min;
+	return rc;
+}
+
+pos_type part_vect_find_median_helper(part_iter b, part_iter e, part_iter median, pos_type xmid, int dim) {
+	pos_type r;
+//	if (e - b == 2) {
+//		for (auto i = b; i < std::min(part_end, e); i++) {
+//			printf("%.8e\n", parts(i).x[dim]);
+//		}
+//
+//	}
+	if (e - b <= 1) {
+		r = xmid;
+	} else {
+		auto m = part_vect_sort(b, e, xmid, dim);
+		if (median > m && median < e) {
+			const auto new_b = m;
+			const auto new_e = e;
+			const auto new_loc = localities[part_vect_locality_id(new_b)];
+			const auto rc = hpx::async < part_vect_avg_pos_action > (new_loc, new_b, new_e, dim).get();
+//			printf("%i %i %i %i %.8e\n", b, e, m, median, xmid);
+//			printf( "- %.8e %.8e %.8e\n", rc.min, rc.max, rc.avg);
+			if (almost_equal(rc.max, rc.min)) {
+				r = rc.max;
+			} else {
+				const auto new_xmid = rc.avg;
+				r = hpx::async < part_vect_find_median_helper_action > (new_loc, new_b, new_e, median, new_xmid, dim).get();
+			}
+		} else if (median >= b && median < m) {
+			const auto new_b = b;
+			const auto new_e = m;
+			const auto rc = part_vect_avg_pos(new_b, new_e, dim);
+//			printf("%i %i %i %i %e\n", b, e, m, median, xmid);
+//			printf( "- %.8e %.8e %.8e\n", rc.min, rc.max, rc.avg);
+			if (almost_equal(rc.max, rc.min)) {
+				r = rc.max;
+			} else {
+				const auto new_xmid = rc.avg;
+				r = part_vect_find_median_helper(new_b, new_e, median, new_xmid, dim);
+			}
+		} else if (median == m) {
+			return xmid;
+		} else {
+			assert(false);
+		}
+	}
+	return r;
+}
+
+pos_type part_vect_find_median(part_iter b, part_iter e, int dim) {
+	const auto xmid = part_vect_avg_pos(b, e, dim).avg;
+	return part_vect_find_median_helper(b, e, (b + e) / 2, xmid, dim);
+}
 
 void part_vect_sort_begin(part_iter b, part_iter e, part_iter mid, float xmid, int dim) {
 	static const auto opts = options::get();
@@ -80,7 +176,7 @@ void part_vect_sort_begin(part_iter b, part_iter e, part_iter mid, float xmid, i
 	std::vector<hpx::future<void>> futs;
 	if (part_vect_locality_id(b) == myid) {
 		for (int n = myid + 1; n <= part_vect_locality_id(mid); n++) {
-			futs.push_back(hpx::async<part_vect_sort_begin_action>(localities[n], b, e, mid, xmid, dim));
+			futs.push_back(hpx::async < part_vect_sort_begin_action > (localities[n], b, e, mid, xmid, dim));
 		}
 	}
 	int nproc = part_vect_locality_id(e - 1) - part_vect_locality_id(b) + 1;
@@ -148,8 +244,8 @@ std::vector<particle> part_vect_sort_end(part_iter b, part_iter e, part_iter mid
 	return low;
 }
 
-HPX_PLAIN_ACTION(part_vect_read);
-HPX_PLAIN_ACTION(part_vect_write);
+HPX_PLAIN_ACTION (part_vect_read);
+HPX_PLAIN_ACTION (part_vect_write);
 
 void part_vect_write(part_iter b, part_iter e, std::vector<particle> these_parts) {
 	const auto id = part_vect_locality_id(b);
@@ -265,10 +361,10 @@ kick_return part_vect_kick(part_iter b, part_iter e, rung_type min_rung, bool do
 
 std::vector<vect<float>> part_vect_read_active_positions(part_iter b, part_iter e, rung_type rung) {
 	std::vector<vect<float>> x;
-	hpx::future<std::vector<vect<float>>> fut;
+	hpx::future < std::vector<vect<float>> > fut;
 	x.reserve(e - b);
 	if (e > part_end) {
-		fut = hpx::async<part_vect_read_active_positions_action>(localities[myid + 1], part_end, e, rung);
+		fut = hpx::async < part_vect_read_active_positions_action > (localities[myid + 1], part_end, e, rung);
 	}
 	for (part_iter i = b; i < std::min(e, part_end); i++) {
 		if (parts(i).rung >= rung) {
@@ -289,7 +385,7 @@ void part_vect_drift(float dt) {
 	std::vector<hpx::future<void>> futs;
 	if (myid == 0) {
 		for (int i = 1; i < localities.size(); i++) {
-			futs.push_back(hpx::async<part_vect_drift_action>(localities[i], dt));
+			futs.push_back(hpx::async < part_vect_drift_action > (localities[i], dt));
 		}
 	}
 	const part_iter chunk_size = std::max(part_iter(1), (part_end - part_begin) / std::thread::hardware_concurrency());
@@ -319,9 +415,9 @@ void part_vect_drift(float dt) {
 std::pair<float, vect<float>> part_vect_center_of_mass(part_iter b, part_iter e) {
 	static const auto m = options::get().m_tot / options::get().problem_size;
 	std::pair<float, vect<float>> rc;
-	hpx::future<std::pair<float, vect<float>>> fut;
+	hpx::future < std::pair<float, vect<float>> > fut;
 	if (e > part_end) {
-		fut = hpx::async<part_vect_center_of_mass_action>(localities[myid + 1], part_end, e);
+		fut = hpx::async < part_vect_center_of_mass_action > (localities[myid + 1], part_end, e);
 	}
 	const auto this_end = std::min(part_end, e);
 	rc.first = 0.0;
@@ -347,7 +443,7 @@ multipole_info part_vect_multipole_info(vect<float> com, rung_type mrung, part_i
 	multipole_info rc;
 	hpx::future<multipole_info> fut;
 	if (e > part_end) {
-		fut = hpx::async<part_vect_multipole_info_action>(localities[myid + 1], com, mrung, part_end, e);
+		fut = hpx::async < part_vect_multipole_info_action > (localities[myid + 1], com, mrung, part_end, e);
 	}
 	const auto this_end = std::min(part_end, e);
 	rc.m = 0.0;
@@ -412,7 +508,7 @@ void part_vect_cache_reset() {
 	std::vector<hpx::future<void>> futs;
 	if (myid == 0) {
 		for (int i = 1; i < localities.size(); i++) {
-			futs.push_back(hpx::async<part_vect_cache_reset_action>(localities[i]));
+			futs.push_back(hpx::async < part_vect_cache_reset_action > (localities[i]));
 		}
 	}
 	for (int i = 0; i < POS_CACHE_SIZE; i++) {
@@ -433,7 +529,7 @@ void part_vect_init() {
 	std::vector<hpx::future<void>> futs;
 	if (n == 0) {
 		for (int i = 1; i < N; i++) {
-			futs.push_back(hpx::async<part_vect_init_action>(localities[i]));
+			futs.push_back(hpx::async < part_vect_init_action > (localities[i]));
 		}
 	}
 	part_begin = n * M / N;
@@ -447,16 +543,16 @@ inline hpx::future<std::vector<vect<pos_type>>> part_vect_read_pos_cache(part_it
 	std::unique_lock<mutex_type> lock(pos_cache_mtx[index]);
 	auto iter = pos_cache[index].find(b);
 	if (iter == pos_cache[index].end()) {
-		hpx::lcos::local::promise<hpx::future<std::vector<vect<pos_type>>>> promise;
+		hpx::lcos::local::promise < hpx::future < std::vector<vect<pos_type>> >> promise;
 		auto fut = promise.get_future();
 		pos_cache[index][b] = fut.then([b](decltype(fut) f) {
 			return f.get().get();
 		});
 		lock.unlock();
-		promise.set_value(hpx::async<part_vect_read_position_action>(localities[part_vect_locality_id(b)], b, e));
+		promise.set_value(hpx::async < part_vect_read_position_action > (localities[part_vect_locality_id(b)], b, e));
 	}
 	return hpx::async(hpx::launch::deferred, [b, index]() {
-		std::unique_lock<mutex_type> lock(pos_cache_mtx[index]);
+		std::unique_lock < mutex_type > lock(pos_cache_mtx[index]);
 		auto future = pos_cache[index][b];
 		lock.unlock();
 		return future.get();
@@ -497,18 +593,17 @@ hpx::future<std::vector<vect<pos_type>>> part_vect_read_position(part_iter b, pa
 
 part_iter part_vect_count_lo(part_iter, part_iter, double xmid, int dim);
 
-HPX_PLAIN_ACTION(part_vect_count_lo);
+HPX_PLAIN_ACTION (part_vect_count_lo);
 
 part_iter part_vect_count_lo(part_iter b, part_iter e, double xmid, int dim) {
 //	printf( "part_vect_count_lo\n");
 	const part_iter N = localities.size();
 	const part_iter M = options::get().problem_size;
 	part_iter count = 0;
-	std::vector<hpx::future<part_iter>> futs;
+	std::vector < hpx::future < part_iter >> futs;
 	if (part_end < e) {
-		int n = part_vect_locality_id(part_end);
 		for (int n = part_vect_locality_id(part_end); n * M / N < e; n++) {
-			auto fut = hpx::async<part_vect_count_lo_action>(localities[n], n * M / N, std::min(e, (n + 1) * M / N), xmid, dim);
+			auto fut = hpx::async < part_vect_count_lo_action > (localities[n], n * M / N, std::min(e, (n + 1) * M / N), xmid, dim);
 			futs.push_back(std::move(fut));
 
 		}
@@ -536,20 +631,13 @@ part_iter part_vect_count_lo(part_iter b, part_iter e, double xmid, int dim) {
 	for (auto &fut : futs) {
 		count += fut.get();
 	}
-//	printf( "Counted %i in low partition on locality %i\n", count, myid);
 	return count;
 }
 
 part_iter part_vect_sort(part_iter b, part_iter e, double xmid, int dim) {
-
-//	printf("Sorting %i %i on %i %i %i\n", b, e, myid, part_begin, part_end);
 	if (e == b) {
 		return e;
 	} else {
-		for (auto i = part_begin; i < part_end; i++) {
-//			printf("%e\n", pos_to_double(parts(i).x[dim]));
-		}
-		//	printf("----\n");
 		if (e <= part_end) {
 			auto lo = b;
 			auto hi = e;
@@ -567,10 +655,6 @@ part_iter part_vect_sort(part_iter b, part_iter e, double xmid, int dim) {
 				}
 				lo++;
 			}
-			for (auto i = part_begin; i < part_end; i++) {
-				//			printf("%e\n", pos_to_double(parts(i).x[dim]));
-			}
-			//		printf("****\n");
 			return hi;
 		} else {
 			auto count = part_vect_count_lo(b, e, xmid, dim);
@@ -591,7 +675,7 @@ range part_vect_range(part_iter b, part_iter e) {
 		const auto this_e = std::min(e, part_end);
 		hpx::future<range> fut;
 		if (this_e != e) {
-			fut = hpx::async<part_vect_range_action>(localities[myid + 1], this_e, e);
+			fut = hpx::async < part_vect_range_action > (localities[myid + 1], this_e, e);
 		}
 		for (part_iter i = b; i < this_e; i++) {
 			const auto &p = parts(i);
@@ -609,7 +693,7 @@ range part_vect_range(part_iter b, part_iter e) {
 			}
 		}
 	} else {
-		auto fut = hpx::async<part_vect_range_action>(localities[id], b, e);
+		auto fut = hpx::async < part_vect_range_action > (localities[id], b, e);
 		r = fut.get();
 	}
 	return r;

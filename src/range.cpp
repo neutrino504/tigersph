@@ -42,7 +42,7 @@ range shift_range(const range &r_, const vect<pos_type> &v) {
 
 bool in_range(const vect<pos_type> &x, const range &r) {
 	for (int dim = 0; dim < NDIM; dim++) {
-		if (x[dim] < r.min[dim] || x[dim] > r.max[dim]) {
+		if ((x[dim] < r.min[dim] || x[dim] > r.max[dim]) && (!almost_equal(x[dim], r.min[dim]) && !almost_equal(x[dim], r.max[dim]))) {
 			return false;
 		}
 	}
@@ -83,8 +83,8 @@ bool ranges_intersect(const range &a, const range &b) {
 range null_range() {
 	range null;
 	for (int dim = 0; dim < NDIM; dim++) {
-		null.min[dim] = std::numeric_limits<pos_type>::max();
-		null.max[dim] = -std::numeric_limits<pos_type>::max();
+		null.min[dim] = std::numeric_limits < pos_type > ::max();
+		null.max[dim] = -std::numeric_limits < pos_type > ::max();
 	}
 	return null;
 }
