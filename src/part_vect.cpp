@@ -79,8 +79,8 @@ avg_pos_return part_vect_avg_pos(part_iter b, part_iter e, int dim) {
 	std::vector < hpx::future < avg_pos_return >> futs;
 	const part_iter N = localities.size();
 	const part_iter M = opts.problem_size;
-	pos_type min = std::numeric_limits < pos_type > ::max();
-	pos_type max = std::numeric_limits < pos_type > ::min();
+	pos_type min = +std::numeric_limits < pos_type > ::max();
+	pos_type max = -std::numeric_limits < pos_type > ::max();
 	if (part_end < e) {
 		for (int n = part_vect_locality_id(part_end); n * M / N < e; n++) {
 			auto fut = hpx::async < part_vect_avg_pos_action > (localities[n], n * M / N, std::min(e, (n + 1) * M / N), dim);
@@ -118,7 +118,9 @@ avg_pos_return part_vect_avg_pos(part_iter b, part_iter e, int dim) {
 
 pos_type part_vect_find_median_helper(part_iter b, part_iter e, part_iter median, pos_type xmid, int dim) {
 	pos_type r;
+//	printf("%i %i %i %.8e\n", b, e, median, xmid);
 //	if (e - b == 2) {
+//		printf( "!\n");
 //		for (auto i = b; i < std::min(part_end, e); i++) {
 //			printf("%.8e\n", parts(i).x[dim]);
 //		}
@@ -396,14 +398,6 @@ void part_vect_drift(float dt) {
 				const vect<double> dx = parts(j).v * dt;
 				vect<double> x = parts(j).x;
 				x += dx;
-				for (int dim = 0; dim < NDIM; dim++) {
-					while (x[dim] >= 1.0) {
-						x[dim] -= 1.0;
-					}
-					while (x[dim] < 0.0) {
-						x[dim] += 1.0;
-					}
-				}
 				parts(j).x = x;
 			}
 		};
@@ -669,8 +663,8 @@ range part_vect_range(part_iter b, part_iter e) {
 	range r;
 	if (id == myid) {
 		for (int dim = 0; dim < NDIM; dim++) {
-			r.max[dim] = 0.0;
-			r.min[dim] = 1.0;
+			r.max[dim] = -std::numeric_limits<pos_type>::max();
+			r.min[dim] = +std::numeric_limits<pos_type>::max();
 		}
 		const auto this_e = std::min(e, part_end);
 		hpx::future<range> fut;

@@ -20,7 +20,6 @@ double timer(void) {
 	return std::chrono::duration_cast < std::chrono::milliseconds > (std::chrono::system_clock::now().time_since_epoch()).count() / 1000.0;
 }
 
-
 kick_return solve_gravity(tree_client root_ptr, rung_type mrung, bool do_out) {
 	auto start = timer();
 	root_ptr.compute_multipoles(mrung, do_out, 0);
@@ -28,9 +27,8 @@ kick_return solve_gravity(tree_client root_ptr, rung_type mrung, bool do_out) {
 	start = timer();
 	expansion<float> L;
 	L = 0.0;
-	auto root_list = std::vector<check_item>(1, root_ptr.get_check_item());
-	auto rc = root_ptr.kick_fmm(root_list,  {
-			{ 0.5, 0.5, 0.5 } }, L, mrung, do_out, 0);
+	auto root_list = std::vector < check_item > (1, root_ptr.get_check_item());
+	auto rc = root_ptr.kick_fmm(root_list, { { 0.5, 0.5, 0.5 } }, L, mrung, do_out, 0);
 //	printf("fmm took %e seconds\n", timer() - start);
 	return rc;
 }
@@ -39,26 +37,20 @@ int hpx_main(int argc, char *argv[]) {
 	printf("sizeof(particle) = %li\n", sizeof(particle));
 	printf("sizeof(tree)     = %li\n", sizeof(tree));
 //	printf("Hardware concurrency = %li\n", hpx::threads::hardware_concurrency());
-	feenableexcept(FE_DIVBYZERO);
-	feenableexcept(FE_INVALID);
-	feenableexcept(FE_OVERFLOW);
+	feenableexcept (FE_DIVBYZERO);
+	feenableexcept (FE_INVALID);
+	feenableexcept (FE_OVERFLOW);
 
 	options opts;
 	opts.process_options(argc, argv);
 	tree::set_theta(opts.theta);
 
-	range root_box;
-	for (int dim = 0; dim < NDIM; dim++) {
-		root_box.min[dim] = 0.0;
-		root_box.max[dim] = 1.0;
-	}
-
 	part_vect_init();
 
 	if (opts.solver_test) {
 		printf("Computing direct solution first\n");
-		tree_client root_ptr = hpx::new_<tree>(hpx::find_here(),root_box, 0, opts.problem_size, 0).get();
-		while( root_ptr.refine(0)) {
+		tree_client root_ptr = hpx::new_ < tree > (hpx::find_here(), part_vect_range(0, opts.problem_size), 0, opts.problem_size, 0).get();
+		while (root_ptr.refine(0)) {
 		}
 		tree::set_theta(1e-10);
 		auto kr = solve_gravity(root_ptr, min_rung(0), true);
@@ -66,8 +58,8 @@ int hpx_main(int argc, char *argv[]) {
 		const auto direct = kr.out;
 		printf("%12s %12s %12s %12s %12s %12s %12s %12s\n", "theta", "time", "GFLOPS", "error", "error99", "gx", "gy", "gz");
 		for (double theta = 1.0; theta >= 0.17; theta -= 0.1) {
-			root_ptr = hpx::new_<tree>(hpx::find_here(),root_box, 0, opts.problem_size, 0).get();
-			while( root_ptr.refine(0)) {
+			root_ptr = hpx::new_ < tree > (hpx::find_here(), part_vect_range(0, opts.problem_size), 0, opts.problem_size, 0).get();
+			while (root_ptr.refine(0)) {
 			}
 			tree::set_theta(theta);
 			tree::reset_flop();
@@ -83,9 +75,9 @@ int hpx_main(int argc, char *argv[]) {
 
 		printf("Forming tree\n");
 		auto tstart = timer();
-		tree_client root_ptr = hpx::new_<tree>(hpx::find_here(),root_box, 0, opts.problem_size, 0).get();
-		while( root_ptr.refine(0)) {
-			printf( "Refining\n");
+		tree_client root_ptr = hpx::new_ < tree > (hpx::find_here(), part_vect_range(0, opts.problem_size), 0, opts.problem_size, 0).get();
+		while (root_ptr.refine(0)) {
+			printf("Refining\n");
 		}
 		printf("Done forming tree took %e seconds\n", timer() - tstart);
 
@@ -151,8 +143,8 @@ int hpx_main(int argc, char *argv[]) {
 			ts = timer();
 			root_ptr = hpx::invalid_id;
 //			printf( "Forming tree\n");
-			root_ptr = hpx::new_<tree>(hpx::find_here(),root_box, 0, opts.problem_size, 0).get();
-			while( root_ptr.refine(0)) {
+			root_ptr = hpx::new_ < tree > (hpx::find_here(), part_vect_range(0, opts.problem_size), 0, opts.problem_size, 0).get();
+			while (root_ptr.refine(0)) {
 			}
 //			printf("Tree took %e seconds\n", timer() - ts);
 			itime = inc(itime, kr.rung);
@@ -173,7 +165,7 @@ int hpx_main(int argc, char *argv[]) {
 #ifndef HPX_LITE
 int main(int argc, char *argv[]) {
 
-	std::vector<std::string> cfg = { "hpx.commandline.allow_unknown=1" };
+	std::vector < std::string > cfg = { "hpx.commandline.allow_unknown=1" };
 
 	hpx::init(argc, argv, cfg);
 }

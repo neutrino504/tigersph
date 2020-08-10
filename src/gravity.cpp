@@ -13,7 +13,6 @@ std::uint64_t gravity_PP_direct(std::vector<force> &f, const std::vector<vect<fl
 	}
 	std::uint64_t flop = 0;
 	static const auto opts = options::get();
-	static const simd_float M(opts.m_tot / opts.problem_size);
 	static const auto h = opts.soft_len;
 	static const auto h2 = h * h;
 	static const simd_float huge = std::numeric_limits<float>::max() / 10.0;
@@ -33,6 +32,7 @@ std::uint64_t gravity_PP_direct(std::vector<force> &f, const std::vector<vect<fl
 	vect<simd_float> X, Y;
 	std::vector<vect<simd_float>> G(x.size());
 	std::vector<simd_float> Phi(x.size());
+	simd_float M(opts.m_tot / opts.problem_size);
 	for (int i = 0; i < x.size(); i++) {
 		G[i] = vect<simd_float>(0.0);
 		Phi[i] = 0.0;
@@ -41,12 +41,17 @@ std::uint64_t gravity_PP_direct(std::vector<force> &f, const std::vector<vect<fl
 	const auto cnt2 = ((cnt1 - 1 + simd_float::size()) / simd_float::size()) * simd_float::size();
 	y.resize(cnt2);
 	for (int j = cnt1; j < cnt2; j++) {
-		y[j] = vect<float>(1.0e+10);
+		y[j] = vect<float>(0.0);
 	}
 	for (int j = 0; j < cnt1; j += simd_float::size()) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			for (int k = 0; k < simd_float::size(); k++) {
 				Y[dim][k] = y[j + k][dim];
+			}
+		}
+		if (j + simd_real::size() > cnt1) {
+			for (int k = cnt1; k < cnt2; k++) {
+				M[k - j] = 0.0;
 			}
 		}
 		for (int i = 0; i < x.size(); i++) {

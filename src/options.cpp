@@ -32,7 +32,7 @@ bool options::process_options(int argc, char *argv[]) {
 	command_opts.add_options() //
 	("help", "produce help message") //
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
-	("problem", po::value < std::string > (&problem)->default_value("cosmos"), "problem type") //
+	("problem", po::value < std::string > (&problem)->default_value("collapse"), "problem type") //
 	("solver_test", po::value<bool>(&solver_test)->default_value(0), "test gravity solver") //
 	("out_parts", po::value<int>(&out_parts)->default_value(-1), "number of particles for output file") //
 	("parts_per_node", po::value<int>(&parts_per_node)->default_value(64), "maximum number of particles on a node") //
